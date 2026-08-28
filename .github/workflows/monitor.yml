@@ -2,11 +2,12 @@ name: Vigilar ofertas RTX 5090
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "3-58/5 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  issues: write
   pages: write
   id-token: write
 
@@ -26,14 +27,20 @@ jobs:
         with:
           python-version: "3.12"
       - name: Buscar ofertas
-        run: python monitor.py --all
-      - name: Guardar estado e informe
+        run: python monitor.py
+      - name: Guardar ofertas ya notificadas
         run: |
           git config user.name "rtx5090-monitor[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add state.json latest.md docs/index.html
-          git diff --cached --quiet || git commit -m "Actualizar ofertas RTX 5090"
-          git push
+          git add state.json
+          git diff --cached --quiet || (git commit -m "Registrar ofertas notificadas" && git push)
+      - name: Avisar de ofertas nuevas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python -c "import json,sys; sys.exit(0 if json.load(open('new_offers.json', encoding='utf-8')) else 1)"; then
+            gh issue create --title "Nueva oferta RTX 5090 detectada" --body-file latest.md --assignee locomundo167-crypto
+          fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
