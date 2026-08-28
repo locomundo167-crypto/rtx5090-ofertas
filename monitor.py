@@ -255,7 +255,7 @@ main{{max-width:900px;margin:auto;padding:48px 20px}}h1{{font-size:clamp(2rem,6v
 .offer,.empty{{background:rgba(18,24,38,.9);border:1px solid #263044;border-radius:18px;padding:24px;box-shadow:0 14px 40px #0005}}.offer h2{{font-size:2rem;margin:14px 0 6px}}
 .badge{{font-size:.8rem;background:#27430b;color:#caff8e;border-radius:999px;padding:6px 9px}}a{{display:inline-block;margin-top:12px;color:#111;background:var(--accent);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}}
 .warning{{color:#ffd479}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
-</style></head><body><main><header><span class="status">● Monitor activo 24/7</span><h1>RTX 5090 a precio razonable</h1><p>Chollo ≤ 2.400 € · Límite de alerta ≤ 2.800 € · Envío orientado a España</p></header>
+</style></head><body><main><header><span class="status">● Monitor activo 24/7</span><h1>RTX 5090: ofertas internacionales</h1><p>Valoradas de mejor a peor · Precio máximo 10.000 € · Tarjetas, equipos y portátiles</p></header>
 {warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Actualización cada 6 horas.</footer></main></body></html>'''
 
 
@@ -307,3 +307,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
