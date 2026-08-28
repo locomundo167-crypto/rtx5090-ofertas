@@ -1,11 +1,11 @@
-# Monitor RTX 5090 España
+# Monitor internacional RTX 5090
 
-Rastreador automático de ofertas nuevas de RTX 5090 con entrega orientada a España.
+Rastreador automático de ofertas RTX 5090 en mercados internacionales.
 
 - Consulta canales públicos de Telegram y páginas directas de tiendas.
 - Se ejecuta en GitHub Actions cada seis horas, aunque el PC esté apagado.
-- Publica una lista web ordenada por precio.
-- Considera chollo hasta 2.400 € y precio razonable hasta 2.800 €.
-- Excluye publicaciones antiguas, portátiles y unidades averiadas o sin devolución.
+- Publica una lista web valorada y ordenada de mejor a peor.
+- Admite tarjetas, reacondicionadas, usadas, portátiles y equipos completos hasta 10.000 €.
+- Etiqueta claramente el tipo y el estado para que las ofertas no comparables no parezcan equivalentes.
 
 La pestaña **Actions** permite lanzar una comprobación manual. Los umbrales y fuentes se editan en `config.json`.

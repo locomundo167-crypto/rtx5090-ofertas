@@ -1,8 +1,8 @@
 {
-  "region": "España",
+  "region": "Internacional",
   "currency": "EUR",
   "excellent_price_eur": 2400,
-  "max_price_eur": 2800,
+  "max_price_eur": 10000,
   "max_post_age_hours": 72,
   "request_timeout_seconds": 40,
   "telegram_sources": [
@@ -21,6 +21,14 @@
     {
       "name": "PcComponentes España",
       "url": "https://t.me/s/pccomponentesESP"
+    },
+    {
+      "name": "Prophecy Tech Offerte Italia",
+      "url": "https://t.me/s/PROPHECYTECHOFFERTE"
+    },
+    {
+      "name": "Ofertas PC Varo",
+      "url": "https://t.me/s/ofertasPcVaro"
     }
   ],
   "web_sources": [
@@ -30,6 +38,26 @@
       "price_eur": 2099,
       "unavailable_terms": [
         "Derzeit nicht verfügbar",
+        "Currently unavailable",
+        "Agotado"
+      ]
+    },
+    {
+      "name": "NVIDIA Marketplace Francia - Founders Edition",
+      "url": "https://marketplace.nvidia.com/fr-fr/consumer/graphics-cards/nvidia-geforce-rtx-5090-resident-evil-requiem-game-bundle-emea/",
+      "price_eur": 2099,
+      "unavailable_terms": [
+        "Actuellement indisponible",
+        "Currently unavailable",
+        "Rupture de stock"
+      ]
+    },
+    {
+      "name": "NVIDIA Marketplace España - Founders Edition",
+      "url": "https://marketplace.nvidia.com/es-es/consumer/graphics-cards/nvidia-geforce-rtx-5090-resident-evil-requiem-game-bundle-emea/",
+      "price_eur": 2099,
+      "unavailable_terms": [
+        "Actualmente no disponible",
         "Currently unavailable",
         "Agotado"
       ]
