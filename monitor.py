@@ -259,7 +259,7 @@ main{{max-width:900px;margin:auto;padding:48px 20px}}h1{{font-size:clamp(2rem,6v
 .badge{{font-size:.8rem;background:#27430b;color:#caff8e;border-radius:999px;padding:6px 9px}}a{{display:inline-block;margin-top:12px;color:#111;background:var(--accent);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}}
 .warning{{color:#ffd479}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
 </style></head><body><main><header><span class="status">● Monitor activo 24/7</span><h1>RTX 5090: ofertas internacionales</h1><p>Valoradas de mejor a peor · Precio máximo 10.000 € · Tarjetas, equipos y portátiles</p></header>
-{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Actualización cada 6 horas.</footer></main></body></html>'''
+{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Actualización cada 5 minutos.</footer></main></body></html>'''
 
 
 def main() -> int:
@@ -311,3 +311,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
