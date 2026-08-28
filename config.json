@@ -4,7 +4,7 @@
   "excellent_price_eur": 2400,
   "max_price_eur": 10000,
   "max_post_age_hours": 72,
-  "request_timeout_seconds": 40,
+  "request_timeout_seconds": 25,
   "telegram_sources": [
     {
       "name": "CoreFinder Alemania - Founders Edition",
@@ -70,5 +70,37 @@
         "Agotado"
       ]
     }
+  ],
+  "listing_sources": [
+    {"name": "PcComponentes", "url": "https://www.pccomponentes.com/buscar/?query=RTX%205090"},
+    {"name": "Coolmod", "url": "https://www.coolmod.com/buscar/?q=RTX+5090"},
+    {"name": "Amazon España", "url": "https://www.amazon.es/s?k=RTX+5090"},
+    {"name": "Amazon Alemania", "url": "https://www.amazon.de/s?k=RTX+5090"},
+    {"name": "Alternate Alemania", "url": "https://www.alternate.de/listing.xhtml?q=RTX+5090"},
+    {"name": "Caseking Alemania", "url": "https://www.caseking.de/search?q=RTX%205090"},
+    {"name": "Mindfactory Alemania", "url": "https://www.mindfactory.de/search_result.php?search_query=RTX+5090"},
+    {"name": "LDLC Francia", "url": "https://www.ldlc.com/recherche/rtx%205090/"},
+    {"name": "Neobyte", "url": "https://www.neobyte.es/buscar?controller=search&s=RTX+5090"},
+    {"name": "Wipoid", "url": "https://www.wipoid.com/buscar?controller=search&s=RTX+5090"},
+    {"name": "Idealo España", "url": "https://www.idealo.es/lista/121646913/rtx-5090.html"},
+    {"name": "Geizhals Europa", "url": "https://geizhals.eu/?fs=RTX+5090&hloc=at&hloc=de&hloc=eu"},
+    {"name": "eBay España", "url": "https://www.ebay.es/sch/i.html?_nkw=RTX+5090&_sop=15"},
+    {"name": "eBay Alemania", "url": "https://www.ebay.de/sch/i.html?_nkw=RTX+5090&_sop=15"},
+    {"name": "eBay Francia", "url": "https://www.ebay.fr/sch/i.html?_nkw=RTX+5090&_sop=15"},
+    {"name": "eBay Italia", "url": "https://www.ebay.it/sch/i.html?_nkw=RTX+5090&_sop=15"},
+    {"name": "Wallapop", "url": "https://es.wallapop.com/app/search?keywords=RTX%205090"},
+    {"name": "Dealabs Francia", "url": "https://www.dealabs.com/search?q=RTX%205090"},
+    {"name": "MyDealz Alemania", "url": "https://www.mydealz.de/search?q=RTX%205090"},
+    {"name": "HotUKDeals", "url": "https://www.hotukdeals.com/search?q=RTX%205090"},
+    {"name": "Reddit ofertas y stock", "url": "https://www.reddit.com/search.rss?q=%22RTX%205090%22%20(price%20OR%20deal%20OR%20stock)&sort=new&t=week"},
+    {"name": "ComputerBase", "url": "https://www.computerbase.de/suche/?q=RTX+5090"},
+    {"name": "Hardwareluxx", "url": "https://www.hardwareluxx.de/index.php/suche.html?searchword=RTX%205090&ordering=newest&searchphrase=all"},
+    {"name": "Scan Reino Unido", "url": "https://www.scan.co.uk/search?q=RTX+5090"},
+    {"name": "Overclockers Reino Unido", "url": "https://www.overclockers.co.uk/?query=RTX%205090"},
+    {"name": "Newegg", "url": "https://www.newegg.com/p/pl?d=RTX+5090"},
+    {"name": "B&H Photo", "url": "https://www.bhphotovideo.com/c/search?q=RTX%205090&sts=ma"},
+    {"name": "Micro Center", "url": "https://www.microcenter.com/search/search_results.aspx?Ntt=RTX+5090"},
+    {"name": "Canada Computers", "url": "https://www.canadacomputers.com/en/search?s=RTX+5090"},
+    {"name": "Memory Express", "url": "https://www.memoryexpress.com/Search/Products?Search=RTX+5090"}
   ]
 }

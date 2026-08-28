@@ -3,7 +3,8 @@
 Rastreador automático de ofertas RTX 5090 en mercados internacionales.
 
 - Consulta canales públicos de Telegram y páginas directas de tiendas.
-- Se ejecuta en GitHub Actions cada cinco minutos, aunque el PC esté apagado.
+- Se ejecuta en GitHub Actions dos veces al día, por la mañana y por la noche, aunque el PC esté apagado.
+- Revisa en paralelo más de cuarenta fuentes entre tiendas, comparadores, marketplaces, foros, agregadores y Telegram.
 - Publica una lista web valorada y ordenada de mejor a peor.
 - Admite tarjetas, reacondicionadas, usadas, portátiles y equipos completos hasta 10.000 €.
 - Etiqueta claramente el tipo y el estado para que las ofertas no comparables no parezcan equivalentes.

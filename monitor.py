@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import html
 import json
 import re
@@ -11,6 +12,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
+from urllib.parse import urljoin
 
 
 ROOT = Path(__file__).resolve().parent
@@ -29,8 +31,18 @@ MESSAGE_RE = re.compile(
 DATETIME_RE = re.compile(r'<time[^>]+datetime="([^"]+)"', re.IGNORECASE)
 TAG_RE = re.compile(r"<[^>]+>")
 PRICE_PATTERNS = (
-    re.compile(r"€\s*([0-9][0-9.,\s]{2,})"),
-    re.compile(r"([0-9][0-9.,\s]{2,})\s*(?:€|EUR)\b", re.IGNORECASE),
+    (re.compile(r"€\s*([0-9][0-9.,\s]{2,})"), 1.0),
+    (re.compile(r"([0-9][0-9.,\s]{2,})\s*(?:€|EUR)\b", re.IGNORECASE), 1.0),
+    (re.compile(r"£\s*([0-9][0-9.,\s]{2,})"), 1.17),
+    (re.compile(r"([0-9][0-9.,\s]{2,})\s*GBP\b", re.IGNORECASE), 1.17),
+    (re.compile(r"(?:US\$|\$)\s*([0-9][0-9.,\s]{2,})"), 0.86),
+    (re.compile(r"([0-9][0-9.,\s]{2,})\s*USD\b", re.IGNORECASE), 0.86),
+    (re.compile(r"(?:CA\$|C\$)\s*([0-9][0-9.,\s]{2,})"), 0.63),
+    (re.compile(r"([0-9][0-9.,\s]{2,})\s*CAD\b", re.IGNORECASE), 0.63),
+)
+ANCHOR_RE = re.compile(
+    r'<a\b[^>]*href=["\'](?P<href>[^"\']+)["\'][^>]*>(?P<body>.*?)</a>',
+    re.IGNORECASE | re.DOTALL,
 )
 PROBLEM_TERMS = (
     "defect",
@@ -121,11 +133,11 @@ def normalize_price(raw: str) -> float | None:
 
 def extract_prices(text: str) -> list[float]:
     prices: list[float] = []
-    for pattern in PRICE_PATTERNS:
+    for pattern, eur_rate in PRICE_PATTERNS:
         for match in pattern.finditer(text):
             price = normalize_price(match.group(1))
             if price is not None:
-                prices.append(price)
+                prices.append(price * eur_rate)
     return prices
 
 
@@ -201,6 +213,52 @@ def scan_web(source: dict, page: str, max_price: float) -> list[dict]:
     ]
 
 
+def scan_listing(source: dict, page: str, max_price: float) -> list[dict]:
+    findings: list[dict] = []
+    for match in ANCHOR_RE.finditer(page):
+        title = clean_text(match.group("body"))
+        folded_title = title.casefold()
+        if "rtx 5090" not in folded_title and "rtx5090" not in folded_title:
+            continue
+        start = max(0, match.start() - 900)
+        end = min(len(page), match.end() + 1800)
+        context = clean_text(page[start:end])
+        prices = [price for price in extract_prices(context) if price <= max_price]
+        if not prices:
+            continue
+        href = html.unescape(match.group("href"))
+        if href.startswith(("javascript:", "#")):
+            continue
+        price = min(prices)
+        category, condition, penalty = classify_offer(context + " " + href)
+        url = urljoin(source["url"], href)
+        findings.append(
+            {
+                "id": url,
+                "source": source["name"],
+                "price_eur": price,
+                "category": category,
+                "condition": condition,
+                "rating": value_rating(price, penalty),
+                "url": url,
+                "date": datetime.now(timezone.utc).isoformat(),
+                "summary": context[:240],
+            }
+        )
+        if len(findings) >= int(source.get("max_results", 12)):
+            break
+    return findings
+
+
+def fetch_and_scan(kind: str, source: dict, timeout: int, max_price: float, max_age: int):
+    page = fetch(source["url"], timeout)
+    if kind == "telegram":
+        return scan_telegram(source, page, max_price, max_age)
+    if kind == "listing":
+        return scan_listing(source, page, max_price)
+    return scan_web(source, page, max_price)
+
+
 def render_report(findings: list[dict], excellent_price: float, errors: list[str]) -> str:
     timestamp = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
     lines = [
@@ -259,10 +317,12 @@ main{{max-width:900px;margin:auto;padding:48px 20px}}h1{{font-size:clamp(2rem,6v
 .badge{{font-size:.8rem;background:#27430b;color:#caff8e;border-radius:999px;padding:6px 9px}}a{{display:inline-block;margin-top:12px;color:#111;background:var(--accent);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}}
 .warning{{color:#ffd479}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
 </style></head><body><main><header><span class="status">● Monitor activo 24/7</span><h1>RTX 5090: ofertas internacionales</h1><p>Valoradas de mejor a peor · Precio máximo 10.000 € · Tarjetas, equipos y portátiles</p></header>
-{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Actualización cada 5 minutos.</footer></main></body></html>'''
+{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Dos revisiones diarias: mañana y noche.</footer></main></body></html>'''
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Busca ofertas RTX 5090 en Telegram público")
     parser.add_argument("--all", action="store_true", help="muestra también publicaciones ya vistas")
     args = parser.parse_args()
@@ -277,19 +337,23 @@ def main() -> int:
     findings: list[dict] = []
     errors: list[str] = []
 
-    for source in config.get("telegram_sources", []):
-        try:
-            page = fetch(source["url"], timeout)
-            findings.extend(scan_telegram(source, page, max_price, max_post_age_hours))
-        except Exception as exc:  # continuar con las demás fuentes
-            errors.append(f"{source['name']}: {type(exc).__name__}")
-
-    for source in config.get("web_sources", []):
-        try:
-            page = fetch(source["url"], timeout)
-            findings.extend(scan_web(source, page, max_price))
-        except Exception as exc:
-            errors.append(f"{source['name']}: {type(exc).__name__}")
+    source_jobs = []
+    source_jobs.extend(("telegram", source) for source in config.get("telegram_sources", []))
+    source_jobs.extend(("web", source) for source in config.get("web_sources", []))
+    source_jobs.extend(("listing", source) for source in config.get("listing_sources", []))
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {
+            executor.submit(
+                fetch_and_scan, kind, source, timeout, max_price, max_post_age_hours
+            ): source
+            for kind, source in source_jobs
+        }
+        for future in as_completed(futures):
+            source = futures[future]
+            try:
+                findings.extend(future.result())
+            except Exception as exc:
+                errors.append(f"{source['name']}: {type(exc).__name__}")
 
     unique = {item["id"]: item for item in findings}
     all_findings = list(unique.values())
@@ -311,4 +375,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
