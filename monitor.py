@@ -18,6 +18,7 @@ CONFIG_PATH = ROOT / "config.json"
 STATE_PATH = ROOT / "state.json"
 REPORT_PATH = ROOT / "latest.md"
 DOCS_PATH = ROOT / "docs" / "index.html"
+NEW_PATH = ROOT / "new_offers.json"
 
 MESSAGE_RE = re.compile(
     r'<div class="tgme_widget_message_wrap[^>]*>.*?'
@@ -137,6 +138,8 @@ def scan_telegram(
         text = clean_text(fragment)
         folded = text.casefold()
         if "rtx 5090" not in folded and "rtx5090" not in folded:
+            continue
+        if re.search(r'to\s+["“]?out of stock', folded):
             continue
         prices = extract_prices(text)
         qualifying = [price for price in prices if price <= max_price]
@@ -292,6 +295,7 @@ def main() -> int:
     all_findings = list(unique.values())
     visible = all_findings if args.all else [item for item in all_findings if item["id"] not in seen]
     REPORT_PATH.write_text(render_report(visible, excellent_price, errors), encoding="utf-8")
+    NEW_PATH.write_text(json.dumps(visible, indent=2, ensure_ascii=False), encoding="utf-8")
     DOCS_PATH.parent.mkdir(parents=True, exist_ok=True)
     DOCS_PATH.write_text(render_html(all_findings, excellent_price, errors), encoding="utf-8")
 
@@ -307,4 +311,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
