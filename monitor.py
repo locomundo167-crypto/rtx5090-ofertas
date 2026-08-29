@@ -81,7 +81,7 @@ JSONLD_RE = re.compile(
 
 
 def classify_offer(text: str) -> tuple[str, str, int]:
-    folded = text.casefold()
+    folded = re.sub(r"[-_/]+", " ", text.casefold())
     if any(term in folded for term in PROBLEM_TERMS):
         return "Tarjeta gráfica", "Averiada o para piezas", 2
     if any(term in folded for term in ("portatil", "portátil", "laptop", "notebook")):
