@@ -497,6 +497,7 @@ def render_html(findings: list[dict], excellent_price: float, errors: list[str])
             f'<p><strong>{html.escape(item["category"])}</strong> · {html.escape(item["condition"])}</p>'
             f'<p class="check">{html.escape(item.get("verification", "Sin comprobar"))}</p>'
             f'<p>{html.escape(item["source"])}</p>'
+            f'<p class="date">Detectada: {html.escape(item["date"][:10] or "Sin fecha")}</p>'
             f'<a href="{html.escape(item["url"], quote=True)}" target="_blank" rel="noopener">Abrir oferta</a>'
             '</article>'
         )
@@ -516,9 +517,9 @@ main{{max-width:900px;margin:auto;padding:48px 20px}}h1{{font-size:clamp(2rem,6v
 .status{{display:inline-block;color:#b9f36a;border:1px solid #4b6f24;border-radius:999px;padding:7px 12px}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:28px}}
 .offer,.empty{{background:rgba(18,24,38,.9);border:1px solid #263044;border-radius:18px;padding:24px;box-shadow:0 14px 40px #0005}}.offer h2{{font-size:2rem;margin:14px 0 6px}}
 .badge{{font-size:.8rem;background:#27430b;color:#caff8e;border-radius:999px;padding:6px 9px}}a{{display:inline-block;margin-top:12px;color:#111;background:var(--accent);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}}
-.warning{{color:#ffd479}}.check{{color:#b9f36a;font-size:.88rem}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
+.warning{{color:#ffd479}}.updated{{display:inline-block;margin-top:10px;color:#fff;background:#1d293d;border-radius:10px;padding:9px 12px}}.check{{color:#b9f36a;font-size:.88rem}}.date{{color:var(--muted);font-size:.88rem}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
 </style></head><body><main><header><span class="status">● Monitor activo 24/7</span><h1>RTX 5090: ofertas internacionales</h1><p>Valoradas de mejor a peor · Precio máximo 10.000 € · Tarjetas, equipos y portátiles</p></header>
-{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Cuatro revisiones diarias, una cada seis horas.</footer></main></body></html>'''
+<p class="updated">Actualizado: {html.escape(timestamp)}</p>{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Cuatro revisiones diarias, una cada seis horas.</footer></main></body></html>'''
 
 
 def main() -> int:
