@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
-from urllib.parse import quote, urljoin
+from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 
 
 ROOT = Path(__file__).resolve().parent
@@ -67,6 +67,13 @@ DISCOUNT_TERMS = (
     "ahorra", "ahorro", "descuento", "risparmia", "économisez", "sparen",
 )
 FINANCING_TERMS = ("per month", "/month", "monthly", "al mes", "pro monat", "financing")
+EXPIRED_TERMS = ("expired:true", "expired%3atrue", "deal expired", "oferta caducada", "angebot abgelaufen")
+MIN_PLAUSIBLE_NEW_CARD_EUR = 1500.0
+ACCESSORY_TERMS = (
+    "compatible with rtx 5090", "supports rtx 5090", "rtx 5090 water block",
+    "rtx 5090 backplate", "rtx 5090 cable", "rtx 5090 connector",
+    "rtx 5090 support bracket", "rtx 5090 power supply", "rtx 5090 psu",
+)
 JSONLD_RE = re.compile(
     r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
     re.IGNORECASE | re.DOTALL,
@@ -198,6 +205,11 @@ def safe_url(base: str, href: str) -> str:
     return quote(absolute, safe=":/?&=%#@+;,~")
 
 
+def canonical_id(url: str) -> str:
+    parts = urlsplit(url)
+    return urlunsplit((parts.scheme.casefold(), parts.netloc.casefold(), parts.path.rstrip("/"), "", ""))
+
+
 def iter_json_objects(value):
     if isinstance(value, dict):
         yield value
@@ -226,6 +238,8 @@ def scan_jsonld(source: dict, page: str, max_price: float) -> list[dict]:
             folded = name.casefold()
             if not is_product or ("rtx 5090" not in folded and "rtx5090" not in folded):
                 continue
+            if any(term in folded for term in ACCESSORY_TERMS):
+                continue
             offers = product.get("offers", [])
             if isinstance(offers, dict):
                 offers = [offers]
@@ -250,8 +264,14 @@ def scan_jsonld(source: dict, page: str, max_price: float) -> list[dict]:
                     continue
                 seen_urls.add(url)
                 category, condition, penalty = classify_offer(name + " " + url)
+                if (
+                    category == "Tarjeta gráfica"
+                    and condition == "Nueva o sin confirmar"
+                    and price < MIN_PLAUSIBLE_NEW_CARD_EUR
+                ):
+                    continue
                 findings.append({
-                    "id": url, "source": source["name"], "price_eur": price,
+                    "id": canonical_id(url), "source": source["name"], "price_eur": price,
                     "category": category, "condition": condition,
                     "rating": value_rating(price, penalty), "url": url,
                     "date": datetime.now(timezone.utc).isoformat(), "summary": name[:240],
@@ -347,6 +367,8 @@ def scan_listing(source: dict, page: str, max_price: float) -> list[dict]:
         folded_title = title.casefold()
         if "rtx 5090" not in folded_title and "rtx5090" not in folded_title:
             continue
+        if any(term in folded_title for term in ACCESSORY_TERMS):
+            continue
         start = max(0, match.start() - 500)
         end = min(len(page), match.end() + 850)
         context = clean_text(page[start:end])
@@ -358,13 +380,22 @@ def scan_listing(source: dict, page: str, max_price: float) -> list[dict]:
         href = html.unescape(match.group("href"))
         if href.startswith(("javascript:", "#")):
             continue
+        expiry_text = (href + " " + context).casefold()
+        if any(term in expiry_text for term in EXPIRED_TERMS):
+            continue
         anchor_position = match.start() - start
         price, _ = min(candidates, key=lambda candidate: abs(candidate[1] - anchor_position))
         category, condition, penalty = classify_offer(context + " " + href)
+        if (
+            category == "Tarjeta gráfica"
+            and condition == "Nueva o sin confirmar"
+            and price < MIN_PLAUSIBLE_NEW_CARD_EUR
+        ):
+            continue
         url = safe_url(source["url"], href)
         findings.append(
             {
-                "id": url,
+                "id": canonical_id(url),
                 "source": source["name"],
                 "price_eur": price,
                 "category": category,
