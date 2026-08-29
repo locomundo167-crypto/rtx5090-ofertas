@@ -11,6 +11,7 @@
     "https://www.alternate.de/INNO3D/I3D-32GB-D7-RTX-5090-ICHILL-X3-Grafikkarte/html/product/100109385",
     "https://www.alternate.de/MSI/GeForce-RTX-5090-32G-GAMING-TRIO-OC-Grafikkarte/html/product/100109565",
     "https://www.alternate.de/MSI/GeForce-RTX-5090-32G-VENTUS-3X-OC-Grafikkarte/html/product/100109567",
+    "https://www.alternate.de/ZOTAC/GeForce-RTX-5090-AMP-Extreme-INFINITY-Grafikkarte/html/product/100110080",
     "https://www.alternate.de/ZOTAC/GeForce-RTX-5090-SOLID-OC-Grafikkarte/html/product/100110079",
     "https://www.canadacomputers.com/en/powered-by-nvidia/268187/gigabyte-aorus-geforce-rtx-5090-master-ice-32g-gv-n5090aorusm-ice-32gd.html?keyword=rtx 5090",
     "https://www.canadacomputers.com/en/powered-by-nvidia/268188/gigabyte-aorus-geforce-rtx-5090-master-ai-gaming-graphics-card-gv-n5090aorus-m-32gd.html?keyword=rtx 5090",
@@ -23,6 +24,7 @@
     "https://www.canadacomputers.com/en/powered-by-nvidia/279630/asus-rog-astral-geforce-rtx-5090-btf-oc-hidden-connector-design-rog-astral-rtx5090-o32g-btf-gaming.html?keyword=rtx 5090",
     "https://www.canadacomputers.com/en/powered-by-nvidia/280942/asus-rog-astral-geforce-rtx-5090-32gb-oc-white-rog-astral-rtx5090-o32g-white.html?keyword=rtx 5090",
     "https://www.canadacomputers.com/en/powered-by-nvidia/287143/zotac-gaming-geforce-rtx-5090-solid-oc-gddr7-triple-fans-zt-b50900j-10a.html?keyword=rtx 5090",
+    "https://www.canadacomputers.com/en/powered-by-nvidia/288293/asus-rog-astral-geforce-rtx-5090-32gb-gpu-rog-thor-1200w-platinum-psu.html?keyword=rtx 5090",
     "https://www.canadacomputers.com/en/powered-by-nvidia/289693/gigabyte-aorus-geforce-rtx-5090-infinity-32gb-gv-n5090aorus-if-32gd.html?keyword=rtx 5090",
     "https://www.memoryexpress.com/Products/MX00132349",
     "https://www.memoryexpress.com/Products/MX00132477",
@@ -37,6 +39,8 @@
     "https://www.memoryexpress.com/Products/MX00136511",
     "https://www.memoryexpress.com/Products/MX00137767",
     "https://www.mydealz.de/deals/gaming-pc-ryzen-9800x3d-rtx-5090-32gb-32gb-ddr5-6000-1tb-ssd-b850m-240mm-rgb-waku-1200w-platinum-2808874",
+    "https://www.newegg.com/aorus-16-geforce-rtx-5090-laptop-gpu-intel-core-ultra-9-275hx-wqxga-32gb-memory-2-tb-ssd/p/N82E16834233610",
+    "https://www.newegg.com/aorus-16-geforce-rtx-5090-laptop-gpu-intel-core-ultra-9-275hx-wqxga-32gb-memory-2-tb-ssd/p/N82E16834233610?Item=9SIC0D6KMT6693&cm_sp=SP-_-3011840-_-0-_-2-_-9SIC0D6KMT6693-_-RTX 5090-_-5090|rtx-_-15",
     "https://www.newegg.com/asus-rog-astral-rog-astral-rtx5090-o32g-white-geforce-rtx-5090-32gb-graphics-card-triple-fans/p/N82E16814126814",
     "https://www.newegg.com/asus-rog-astral-rog-astral-rtx5090-p32g-edition20-geforce-rtx-5090-32gb-video-card-triple-fans/p/N82E16814126843",
     "https://www.newegg.com/gigabyte-gv-n5090aorusm-ice-32gd-geforce-rtx-5090-32gb-graphics-card-triple-fans/p/N82E16814932765",
@@ -46,9 +50,12 @@
     "https://www.newegg.com/p/1FT-000A-008Z3",
     "https://www.newegg.com/p/1FT-000A-00927",
     "https://www.newegg.com/p/1FT-000A-00937",
+    "https://www.newegg.com/p/N82E16889850020",
     "https://www.newegg.com/pny-technologies-inc-geforce-rtx-5090-graphics-card/p/1FT-000P-00662",
     "https://www.newegg.com/pny-technologies-inc-nvidia-geforce-rtx-5090-32gb-video-card-nvidia-triple-fans/p/1DW-000M-001Y0",
+    "https://www.newegg.com/skytech-gaming-desktop-pcs-geforce-rtx-5090-amd-ryzen-7-9850x3d-32gb-ddr5-2tb-nvme-ssd-st-o11v-3155-b-al-black/p/3D5-000Z-00419",
+    "https://www.newegg.com/stormcraft-valkyrie-va980xdcc-gaming-pc-ryzen-7-9800x3d-rtx-5090-32gb-2tb-geforce-rtx-5090-amd-ryzen-7-9800x3d-32gb-ddr5-2tb-ssd-gen-4-0-ssd-va980xdcc-590n1/p/N82E16883420063",
     "https://www.newegg.com/zotac-rtx-5090-arcticstorm-aio-geforce-rtx-5090-32gb-graphics-card-liquid-cooler/p/N82E16814500644"
   ],
-  "last_run": "2026-08-28T22:55:02.727942+00:00"
+  "last_run": "2026-08-29T07:23:39.211802+00:00"
 }
