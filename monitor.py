@@ -84,7 +84,10 @@ def classify_offer(text: str) -> tuple[str, str, int]:
     folded = re.sub(r"[-_/]+", " ", text.casefold())
     if any(term in folded for term in PROBLEM_TERMS):
         return "Tarjeta gráfica", "Averiada o para piezas", 2
-    if any(term in folded for term in ("portatil", "portátil", "laptop", "notebook")):
+    if any(term in folded for term in (
+        "portatil", "portátil", "laptop", "notebook", "stealth 18", "vector 18",
+        "titan 18", "scar 18", "blade 18", "omen max", "aorus 16",
+    )):
         return "Portátil", "Sin confirmar", 0
     if any(term in folded for term in ("pc completo", "gaming pc", "ordenador", "desktop pc")):
         return "PC completo", "Sin confirmar", 0
