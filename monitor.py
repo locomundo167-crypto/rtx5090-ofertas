@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 
 ROOT = Path(__file__).resolve().parent
@@ -35,11 +35,14 @@ PRICE_PATTERNS = (
     (re.compile(r"([0-9][0-9.,\s]{2,})\s*(?:€|EUR)\b", re.IGNORECASE), 1.0),
     (re.compile(r"£\s*([0-9][0-9.,\s]{2,})"), 1.17),
     (re.compile(r"([0-9][0-9.,\s]{2,})\s*GBP\b", re.IGNORECASE), 1.17),
-    (re.compile(r"(?:US\$|\$)\s*([0-9][0-9.,\s]{2,})"), 0.86),
+    (re.compile(r"US\$\s*([0-9][0-9.,\s]{2,})", re.IGNORECASE), 0.86),
     (re.compile(r"([0-9][0-9.,\s]{2,})\s*USD\b", re.IGNORECASE), 0.86),
     (re.compile(r"(?:CA\$|C\$)\s*([0-9][0-9.,\s]{2,})"), 0.63),
     (re.compile(r"([0-9][0-9.,\s]{2,})\s*CAD\b", re.IGNORECASE), 0.63),
+    (re.compile(r"(?:AU\$|A\$)\s*([0-9][0-9.,\s]{2,})", re.IGNORECASE), 0.56),
+    (re.compile(r"([0-9][0-9.,\s]{2,})\s*AUD\b", re.IGNORECASE), 0.56),
 )
+GENERIC_DOLLAR_RE = re.compile(r"(?<![A-Za-z])\$\s*([0-9][0-9.,\s]{2,})")
 ANCHOR_RE = re.compile(
     r'<a\b[^>]*href=["\'](?P<href>[^"\']+)["\'][^>]*>(?P<body>.*?)</a>',
     re.IGNORECASE | re.DOTALL,
@@ -52,6 +55,21 @@ PROBLEM_TERMS = (
     "sin devolucion",
     "sin devolución",
     "for parts",
+)
+UNAVAILABLE_TERMS = (
+    "out of stock", "sold out", "agotado", "no disponible", "sin stock",
+    "nicht verfügbar", "ausverkauft", "rupture de stock", "épuisé",
+    "non disponibile", "esaurito", "niet op voorraad",
+)
+CURRENCY_TO_EUR = {"EUR": 1.0, "GBP": 1.17, "USD": 0.86, "CAD": 0.63, "AUD": 0.56}
+DISCOUNT_TERMS = (
+    "save", "saving", "discount", "cashback", "coupon", "rebate",
+    "ahorra", "ahorro", "descuento", "risparmia", "économisez", "sparen",
+)
+FINANCING_TERMS = ("per month", "/month", "monthly", "al mes", "pro monat", "financing")
+JSONLD_RE = re.compile(
+    r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -131,14 +149,116 @@ def normalize_price(raw: str) -> float | None:
     return price if 500 <= price <= 20000 else None
 
 
-def extract_prices(text: str) -> list[float]:
+def extract_prices(text: str, currency_hint: str | None = None) -> list[float]:
     prices: list[float] = []
     for pattern, eur_rate in PRICE_PATTERNS:
         for match in pattern.finditer(text):
             price = normalize_price(match.group(1))
             if price is not None:
                 prices.append(price * eur_rate)
+    dollar_rate = CURRENCY_TO_EUR.get(str(currency_hint or "USD").upper(), 0.86)
+    for match in GENERIC_DOLLAR_RE.finditer(text):
+        price = normalize_price(match.group(1))
+        if price is not None:
+            prices.append(price * dollar_rate)
     return prices
+
+
+def extract_price_candidates(text: str, currency_hint: str | None = None) -> list[tuple[float, int]]:
+    candidates: list[tuple[float, int]] = []
+    for pattern, eur_rate in PRICE_PATTERNS:
+        for match in pattern.finditer(text):
+            price = normalize_price(match.group(1))
+            if price is not None:
+                candidates.append((price * eur_rate, match.start()))
+    dollar_rate = CURRENCY_TO_EUR.get(str(currency_hint or "USD").upper(), 0.86)
+    for match in GENERIC_DOLLAR_RE.finditer(text):
+        price = normalize_price(match.group(1))
+        if price is not None:
+            candidates.append((price * dollar_rate, match.start()))
+    return candidates
+
+
+def purchase_price_candidates(text: str, currency_hint: str | None = None) -> list[tuple[float, int]]:
+    candidates: list[tuple[float, int]] = []
+    folded = text.casefold()
+    for price, position in extract_price_candidates(text, currency_hint):
+        before = folded[max(0, position - 45):position]
+        nearby = folded[max(0, position - 45): position + 80]
+        if any(term in before for term in DISCOUNT_TERMS):
+            continue
+        if any(term in nearby for term in FINANCING_TERMS):
+            continue
+        candidates.append((price, position))
+    return candidates
+
+
+def safe_url(base: str, href: str) -> str:
+    absolute = urljoin(base, html.unescape(href))
+    return quote(absolute, safe=":/?&=%#@+;,~")
+
+
+def iter_json_objects(value):
+    if isinstance(value, dict):
+        yield value
+        for nested in value.values():
+            yield from iter_json_objects(nested)
+    elif isinstance(value, list):
+        for nested in value:
+            yield from iter_json_objects(nested)
+
+
+def scan_jsonld(source: dict, page: str, max_price: float) -> list[dict]:
+    findings: list[dict] = []
+    seen_urls: set[str] = set()
+    for script in JSONLD_RE.findall(page):
+        try:
+            payload = json.loads(html.unescape(script).strip())
+        except (json.JSONDecodeError, TypeError):
+            continue
+        for product in iter_json_objects(payload):
+            product_type = product.get("@type", "")
+            if isinstance(product_type, list):
+                is_product = any(str(item).casefold() == "product" for item in product_type)
+            else:
+                is_product = str(product_type).casefold() == "product"
+            name = clean_text(str(product.get("name", "")))
+            folded = name.casefold()
+            if not is_product or ("rtx 5090" not in folded and "rtx5090" not in folded):
+                continue
+            offers = product.get("offers", [])
+            if isinstance(offers, dict):
+                offers = [offers]
+            for offer in (offers if isinstance(offers, list) else []):
+                if not isinstance(offer, dict):
+                    continue
+                availability = str(offer.get("availability", "")).casefold()
+                if any(term in availability for term in ("outofstock", "soldout", "discontinued")):
+                    continue
+                raw_price = offer.get("price", offer.get("lowPrice"))
+                try:
+                    numeric = float(str(raw_price).replace(" ", "").replace(",", "."))
+                except (TypeError, ValueError):
+                    continue
+                currency = str(offer.get("priceCurrency", "EUR")).upper()
+                price = numeric * CURRENCY_TO_EUR.get(currency, 1.0)
+                if not 500 <= price <= max_price:
+                    continue
+                href = str(offer.get("url") or product.get("url") or source["url"])
+                url = safe_url(source["url"], href)
+                if url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                category, condition, penalty = classify_offer(name + " " + url)
+                findings.append({
+                    "id": url, "source": source["name"], "price_eur": price,
+                    "category": category, "condition": condition,
+                    "rating": value_rating(price, penalty), "url": url,
+                    "date": datetime.now(timezone.utc).isoformat(), "summary": name[:240],
+                    "verification": "Datos estructurados del producto", "kind": "listing",
+                    "currency_hint": currency,
+                })
+    return findings
 
 
 def scan_telegram(
@@ -181,6 +301,8 @@ def scan_telegram(
                 "url": f"https://t.me/{post}",
                 "date": date_match.group(1),
                 "summary": text[:240],
+                "verification": "Precio publicado en Telegram",
+                "kind": "telegram",
             }
         )
     return findings
@@ -209,29 +331,37 @@ def scan_web(source: dict, page: str, max_price: float) -> list[dict]:
             "url": source["url"],
             "date": datetime.now(timezone.utc).isoformat(),
             "summary": text[:240],
+            "verification": "Página oficial directa",
+            "kind": "web",
         }
     ]
 
 
 def scan_listing(source: dict, page: str, max_price: float) -> list[dict]:
+    structured = scan_jsonld(source, page, max_price)
+    if structured:
+        return structured[: int(source.get("max_results", 16))]
     findings: list[dict] = []
     for match in ANCHOR_RE.finditer(page):
         title = clean_text(match.group("body"))
         folded_title = title.casefold()
         if "rtx 5090" not in folded_title and "rtx5090" not in folded_title:
             continue
-        start = max(0, match.start() - 900)
-        end = min(len(page), match.end() + 1800)
+        start = max(0, match.start() - 500)
+        end = min(len(page), match.end() + 850)
         context = clean_text(page[start:end])
-        prices = [price for price in extract_prices(context) if price <= max_price]
-        if not prices:
+        if any(term in context.casefold() for term in UNAVAILABLE_TERMS):
+            continue
+        candidates = [(price, pos) for price, pos in purchase_price_candidates(context, source.get("currency")) if price <= max_price]
+        if not candidates:
             continue
         href = html.unescape(match.group("href"))
         if href.startswith(("javascript:", "#")):
             continue
-        price = min(prices)
+        anchor_position = match.start() - start
+        price, _ = min(candidates, key=lambda candidate: abs(candidate[1] - anchor_position))
         category, condition, penalty = classify_offer(context + " " + href)
-        url = urljoin(source["url"], href)
+        url = safe_url(source["url"], href)
         findings.append(
             {
                 "id": url,
@@ -243,11 +373,47 @@ def scan_listing(source: dict, page: str, max_price: float) -> list[dict]:
                 "url": url,
                 "date": datetime.now(timezone.utc).isoformat(),
                 "summary": context[:240],
+                "verification": "Pendiente de comprobar", "kind": "listing",
+                "currency_hint": source.get("currency", ""),
             }
         )
-        if len(findings) >= int(source.get("max_results", 12)):
+        if len(findings) >= int(source.get("max_results", 16)):
             break
     return findings
+
+
+def verify_listing(item: dict, timeout: int) -> tuple[dict | None, str | None]:
+    if item.get("verification") == "Datos estructurados del producto":
+        item["verification"] = "Verificado en datos del producto"
+        return item, None
+    try:
+        page = fetch(item["url"], timeout)
+    except Exception as exc:
+        item["verification"] = "No verificable; confirma al abrir"
+        return item, f"{item['source']} (verificación): {type(exc).__name__}"
+    text = clean_text(page)
+    folded = text.casefold()
+    if "rtx 5090" not in folded and "rtx5090" not in folded:
+        return None, f"{item['source']}: producto descartado por no ser RTX 5090"
+    prices = [price for price, _ in purchase_price_candidates(text, item.get("currency_hint"))]
+    expected = float(item["price_eur"])
+    tolerance = max(20.0, expected * 0.04)
+    if not any(abs(price - expected) <= tolerance for price in prices):
+        return None, f"{item['source']}: precio descartado por no coincidir con el producto"
+    item["verification"] = "Precio verificado en la oferta"
+    return item, None
+
+
+def balance_sources(findings: list[dict], per_source: int) -> list[dict]:
+    counts: dict[str, int] = {}
+    balanced: list[dict] = []
+    for item in sorted(findings, key=lambda row: (-row["rating"], row["price_eur"])):
+        source = item["source"]
+        if counts.get(source, 0) >= per_source:
+            continue
+        counts[source] = counts.get(source, 0) + 1
+        balanced.append(item)
+    return balanced
 
 
 def fetch_and_scan(kind: str, source: dict, timeout: int, max_price: float, max_age: int):
@@ -268,12 +434,12 @@ def render_report(findings: list[dict], excellent_price: float, errors: list[str
         "",
     ]
     if findings:
-        lines += ["| Valoración | Precio | Tipo | Estado | Fuente | Fecha | Enlace |", "|---|---:|---|---|---|---|---|"]
+        lines += ["| Valoración | Precio | Tipo | Estado | Comprobación | Fuente | Fecha | Enlace |", "|---|---:|---|---|---|---|---|---|"]
         for item in sorted(findings, key=lambda row: (-row["rating"], row["price_eur"])):
             level = "★" * item["rating"] + "☆" * (5 - item["rating"])
             date = item["date"][:10] or "Sin fecha"
             lines.append(
-                f"| {level} | {item['price_eur']:.2f} € | {item['category']} | {item['condition']} | {item['source']} | "
+                f"| {level} | {item['price_eur']:.2f} € | {item['category']} | {item['condition']} | {item.get('verification', 'Sin comprobar')} | {item['source']} | "
                 f"{date} | [Abrir oferta]({item['url']}) |"
             )
     else:
@@ -295,6 +461,7 @@ def render_html(findings: list[dict], excellent_price: float, errors: list[str])
             f'<span class="badge">{html.escape(level)}</span>'
             f'<h2>{item["price_eur"]:.2f} €</h2>'
             f'<p><strong>{html.escape(item["category"])}</strong> · {html.escape(item["condition"])}</p>'
+            f'<p class="check">{html.escape(item.get("verification", "Sin comprobar"))}</p>'
             f'<p>{html.escape(item["source"])}</p>'
             f'<a href="{html.escape(item["url"], quote=True)}" target="_blank" rel="noopener">Abrir oferta</a>'
             '</article>'
@@ -315,9 +482,9 @@ main{{max-width:900px;margin:auto;padding:48px 20px}}h1{{font-size:clamp(2rem,6v
 .status{{display:inline-block;color:#b9f36a;border:1px solid #4b6f24;border-radius:999px;padding:7px 12px}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:28px}}
 .offer,.empty{{background:rgba(18,24,38,.9);border:1px solid #263044;border-radius:18px;padding:24px;box-shadow:0 14px 40px #0005}}.offer h2{{font-size:2rem;margin:14px 0 6px}}
 .badge{{font-size:.8rem;background:#27430b;color:#caff8e;border-radius:999px;padding:6px 9px}}a{{display:inline-block;margin-top:12px;color:#111;background:var(--accent);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}}
-.warning{{color:#ffd479}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
+.warning{{color:#ffd479}}.check{{color:#b9f36a;font-size:.88rem}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
 </style></head><body><main><header><span class="status">● Monitor activo 24/7</span><h1>RTX 5090: ofertas internacionales</h1><p>Valoradas de mejor a peor · Precio máximo 10.000 € · Tarjetas, equipos y portátiles</p></header>
-{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Dos revisiones diarias: mañana y noche.</footer></main></body></html>'''
+{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Cuatro revisiones diarias, una cada seis horas.</footer></main></body></html>'''
 
 
 def main() -> int:
@@ -334,6 +501,7 @@ def main() -> int:
     max_price = float(config.get("max_price_eur", 2800))
     max_post_age_hours = int(config.get("max_post_age_hours", 72))
     excellent_price = float(config.get("excellent_price_eur", 2400))
+    per_source = int(config.get("display_results_per_source", 4))
     findings: list[dict] = []
     errors: list[str] = []
 
@@ -356,14 +524,26 @@ def main() -> int:
                 errors.append(f"{source['name']}: {type(exc).__name__}")
 
     unique = {item["id"]: item for item in findings}
-    all_findings = list(unique.values())
+    candidates = balance_sources(list(unique.values()), per_source)
+    listing_candidates = [item for item in candidates if item.get("kind") == "listing"]
+    other_candidates = [item for item in candidates if item.get("kind") != "listing"]
+    checked: list[dict] = list(other_candidates)
+    with ThreadPoolExecutor(max_workers=16) as executor:
+        futures = {executor.submit(verify_listing, item, timeout): item for item in listing_candidates}
+        for future in as_completed(futures):
+            item, warning = future.result()
+            if item is not None:
+                checked.append(item)
+            if warning:
+                errors.append(warning)
+    all_findings = sorted(checked, key=lambda row: (-row["rating"], row["price_eur"]))
     visible = all_findings if args.all else [item for item in all_findings if item["id"] not in seen]
     REPORT_PATH.write_text(render_report(visible, excellent_price, errors), encoding="utf-8")
     NEW_PATH.write_text(json.dumps(visible, indent=2, ensure_ascii=False), encoding="utf-8")
     DOCS_PATH.parent.mkdir(parents=True, exist_ok=True)
     DOCS_PATH.write_text(render_html(all_findings, excellent_price, errors), encoding="utf-8")
 
-    state["seen"] = sorted(seen | set(unique))
+    state["seen"] = sorted(seen | {item["id"] for item in all_findings})
     state["last_run"] = datetime.now(timezone.utc).isoformat()
     STATE_PATH.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
