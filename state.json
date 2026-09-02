@@ -11,10 +11,12 @@
     "https://www.alternate.de/ASUS/GeForce-RTX-5090-ROG-ASTRAL-LC-GAMING-OC-Grafikkarte/html/product/100110137",
     "https://www.alternate.de/ASUS/GeForce-RTX-5090-TUF-GAMING-OC-Grafikkarte/html/product/100110147",
     "https://www.alternate.de/GIGABYTE/GeForce-RTX-5090-AORUS-INFINITY-32G-Grafikkarte/html/product/100210277",
+    "https://www.alternate.de/GIGABYTE/GeForce-RTX-5090-AORUS-MASTER-32G-Grafikkarte/html/product/100108932",
     "https://www.alternate.de/GIGABYTE/GeForce-RTX-5090-AORUS-MASTER-ICE-32G-Grafikkarte/html/product/100108931",
     "https://www.alternate.de/GIGABYTE/GeForce-RTX-5090-AORUS-STEALTH-ICE-32G-Grafikkarte/html/product/100141367",
     "https://www.alternate.de/GIGABYTE/GeForce-RTX-5090-AORUS-XTREME-WATERFORCE-32G-Grafikkarte/html/product/100108927",
     "https://www.alternate.de/GIGABYTE/GeForce-RTX-5090-AORUS-XTREME-WATERFORCE-WB-32G-Grafikkarte/html/product/100108929",
+    "https://www.alternate.de/GIGABYTE/GeForce-RTX-5090-GAMING-OC-32G-Grafikkarte/html/product/100108936",
     "https://www.alternate.de/INNO3D/GeForce-RTX-5090-ICHILL-Frostbite-Grafikkarte/html/product/100109383",
     "https://www.alternate.de/INNO3D/I3D-32GB-D7-RTX-5090-ICHILL-X3-Grafikkarte/html/product/100109385",
     "https://www.alternate.de/MSI/GeForce-RTX-5090-32G-GAMING-TRIO-OC-Grafikkarte/html/product/100109565",
@@ -25,6 +27,7 @@
     "https://www.alternate.nl/ASUS/ROG-Strix-SCAR-16-G635LX-RW042W-16-inch-Copilotplus-gaming-laptop/html/product/1936107",
     "https://www.alternate.nl/ASUS/TUF-Gaming-GeForce-RTX-5090-OC-grafische-kaart/html/product/100110147",
     "https://www.alternate.nl/Acer/Predator-Helios-18-AI-PH18-73-98BP-18-inch-gaming-laptop/html/product/1938010",
+    "https://www.alternate.nl/GIGABYTE/GeForce-RTX-5090-WINDFORCE-OC-32G-grafische-kaart/html/product/100108938",
     "https://www.alternate.nl/INNO3D/GeForce-RTX-5090-ICHILL-FROSTBITE-PRO-grafische-kaart/html/product/100160943",
     "https://www.alternate.nl/INNO3D/GeForce-RTX-5090-X3-grafische-kaart/html/product/100109380",
     "https://www.alternate.nl/MSI/GeForce-RTX-5090-32G-SUPRIM-SOC-grafische-kaart/html/product/100109563",
@@ -106,5 +109,5 @@
     "https://www.nvidiaclub.com/market-watch/geforce-rtx-5090",
     "https://www.nvidiaclub.com/market-watch/geforce-rtx-5090/?region=US"
   ],
-  "last_run": "2026-09-02T07:24:30.025482+00:00"
+  "last_run": "2026-09-02T13:25:53.939058+00:00"
 }
