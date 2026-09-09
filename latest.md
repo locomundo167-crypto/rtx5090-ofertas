@@ -1,5 +1,10 @@
-# Resultados del monitor RTX 5090
+# Seguimiento: Nintendo Switch 2 Zelda 40.º aniversario
 
-Última comprobación: 2026-08-28T19:12:29+00:00
+Última comprobación: **2026-09-09 18:23 UTC**.
 
-No se encontraron publicaciones dentro del límite configurado.
+| Tienda | Estado | Enlace |
+|---|---|---|
+| Nintendo Store España | ⚪ No verificado: La página no confirmó el producto exacto | [Abrir](https://store.nintendo.com/es-es/nintendo-switch-2-edicin-40-aniversario-de-the-legend-of-zelda-P00211) |
+| Xtralife | ⚪ No verificado: La página no confirmó el producto exacto | [Abrir](https://www.xtralife.com/producto/nintendo-switch-2-edicion-the-legend-of-zelda-40-aniversario-switch-2-edicion-especial/113185) |
+| GAME España | ⏳ No disponible: Aún no disponible | [Abrir](https://www.game.es/nintendo-switch-2-edicion-zelda-40th-nintendo-switch-2-267689) |
+| MediaMarkt España | ⚪ No verificado: No verificable: HTTP Error 403: Forbidden | [Abrir](https://www.mediamarkt.es/es/product/_consola-nintendo-switch-2-edicion-zelda-40-aniversario-79-full-hd-hdr-120-hz-256-gb-magnetic-joy-con-2-con-modo-raton-bateria-extraible-1674231.html) |
