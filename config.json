@@ -1,1 +1,121 @@
-{"timeout_seconds":25,"sources":[{"id":"nintendo-es","name":"Nintendo Store España","url":"https://store.nintendo.com/es-es/nintendo-switch-2-edicin-40-aniversario-de-the-legend-of-zelda-P00211","required_terms":["nintendo switch 2","zelda"],"unavailable_terms":["este artículo está agotado","agotado"],"available_terms":["añadir a la cesta","añadir al carrito","reservar ahora"]},{"id":"xtralife","name":"Xtralife","url":"https://www.xtralife.com/producto/nintendo-switch-2-edicion-the-legend-of-zelda-40-aniversario-switch-2-edicion-especial/113185","required_terms":["nintendo switch 2","zelda"],"unavailable_terms":["pendiente abrir reserva","agotado"],"available_terms":["reservar ahora","añadir a la cesta","añadir al carrito"]},{"id":"game-es","name":"GAME España","url":"https://www.game.es/nintendo-switch-2-edicion-zelda-40th-nintendo-switch-2-267689","required_terms":["nintendo switch 2","zelda"],"unavailable_terms":["próximamente","agotado"],"available_terms":["reservar ahora","añadir a la cesta","añadir al carrito"]},{"id":"mediamarkt-es","name":"MediaMarkt España","url":"https://www.mediamarkt.es/es/product/_consola-nintendo-switch-2-edicion-zelda-40-aniversario-79-full-hd-hdr-120-hz-256-gb-magnetic-joy-con-2-con-modo-raton-bateria-extraible-1674231.html","required_terms":["nintendo switch 2","zelda"],"unavailable_terms":["disponible próximamente","agotado","no disponible"],"available_terms":["añadir a la cesta","añadir al carrito","comprar ahora"]}]}
+{
+  "timeout_seconds": 25,
+  "sources": [
+    {
+      "id": "nintendo-es",
+      "name": "Nintendo Store España",
+      "url": "https://store.nintendo.com/es-es/nintendo-switch-2-edicin-40-aniversario-de-the-legend-of-zelda-P00211",
+      "required_terms": [
+        "nintendo switch 2",
+        "zelda"
+      ],
+      "unavailable_terms": [
+        "este artículo está agotado",
+        "agotado"
+      ],
+      "available_terms": [
+        "añadir a la cesta",
+        "añadir al carrito",
+        "reservar ahora"
+      ]
+    },
+    {
+      "id": "xtralife",
+      "name": "Xtralife",
+      "url": "https://www.xtralife.com/producto/nintendo-switch-2-edicion-the-legend-of-zelda-40-aniversario-switch-2-edicion-especial/113185",
+      "required_terms": [
+        "nintendo switch 2",
+        "zelda"
+      ],
+      "unavailable_terms": [
+        "pendiente abrir reserva",
+        "agotado"
+      ],
+      "available_terms": [
+        "reservar ahora",
+        "añadir a la cesta",
+        "añadir al carrito"
+      ]
+    },
+    {
+      "id": "game-es",
+      "name": "GAME España",
+      "url": "https://www.game.es/nintendo-switch-2-edicion-zelda-40th-nintendo-switch-2-267689",
+      "required_terms": [
+        "nintendo switch 2",
+        "zelda"
+      ],
+      "unavailable_terms": [
+        "próximamente",
+        "agotado"
+      ],
+      "available_terms": [
+        "reservar ahora",
+        "añadir a la cesta",
+        "añadir al carrito"
+      ]
+    },
+    {
+      "id": "mediamarkt-es",
+      "name": "MediaMarkt España",
+      "url": "https://www.mediamarkt.es/es/product/_consola-nintendo-switch-2-edicion-zelda-40-aniversario-79-full-hd-hdr-120-hz-256-gb-magnetic-joy-con-2-con-modo-raton-bateria-extraible-1674231.html",
+      "required_terms": [
+        "nintendo switch 2",
+        "zelda"
+      ],
+      "unavailable_terms": [
+        "disponible próximamente",
+        "agotado",
+        "no disponible"
+      ],
+      "available_terms": [
+        "añadir a la cesta",
+        "añadir al carrito",
+        "comprar ahora"
+      ]
+    },
+    {
+      "id": "fnac-es",
+      "name": "Fnac España",
+      "url": "https://www.fnac.es/Consola-Nintendo-Switch-2-The-Legend-of-Zelda-40-Aniversario-Videoconsola-Consola-Nintendo-Switch-2/a13481099",
+      "required_terms": [
+        "consola nintendo switch 2",
+        "zelda",
+        "40 aniversario"
+      ],
+      "unavailable_terms": [
+        "no disponible en fnac.es",
+        "artículo no disponible en web",
+        "agotado"
+      ],
+      "available_terms": [
+        "añadir a la cesta",
+        "añadir al carrito",
+        "añadir a cesta"
+      ]
+    },
+    {
+      "id": "eci-es",
+      "name": "El Corte Inglés (búsqueda de ficha)",
+      "url": "https://www.elcorteingles.es/search-nwx/?s=Nintendo+Switch+2+Zelda+40+aniversario&stype=text_box",
+      "mode": "discovery"
+    },
+    {
+      "id": "impactgame-es",
+      "name": "Impact Game",
+      "url": "https://impactgame.es/producto/reserva-consola-nintendo-switch-2-zelda-40-aniversario/",
+      "required_terms": [
+        "consola nintendo switch 2",
+        "zelda",
+        "40 aniversario"
+      ],
+      "unavailable_terms": [
+        "agotado",
+        "sin existencias"
+      ],
+      "available_terms": [
+        "añadir al carrito"
+      ]
+    }
+  ]
+}
