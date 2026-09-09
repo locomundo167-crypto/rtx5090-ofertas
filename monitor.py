@@ -1,592 +1,70 @@
-#!/usr/bin/env python3
-"""Rastreador ligero de ofertas RTX 5090 en canales publicos de Telegram."""
-
 from __future__ import annotations
-
-import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import html
 import json
 import re
-import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from urllib.error import URLError
 from urllib.request import Request, urlopen
-from urllib.parse import quote, urljoin, urlsplit, urlunsplit
-
 
 ROOT = Path(__file__).resolve().parent
-CONFIG_PATH = ROOT / "config.json"
-STATE_PATH = ROOT / "state.json"
-REPORT_PATH = ROOT / "latest.md"
-DOCS_PATH = ROOT / "docs" / "index.html"
-NEW_PATH = ROOT / "new_offers.json"
+CONFIG = ROOT / "config.json"
+STATE = ROOT / "state.json"
+LATEST = ROOT / "latest.md"
+ALERTS = ROOT / "new_offers.json"
+DOCS = ROOT / "docs" / "index.html"
 
-MESSAGE_RE = re.compile(
-    r'<div class="tgme_widget_message_wrap[^>]*>.*?'
-    r'<div class="tgme_widget_message[^>]*data-post="(?P<post>[^"]+)".*?'
-    r'</div>\s*</div>\s*</div>\s*</div>',
-    re.IGNORECASE | re.DOTALL,
-)
-DATETIME_RE = re.compile(r'<time[^>]+datetime="([^"]+)"', re.IGNORECASE)
-TAG_RE = re.compile(r"<[^>]+>")
-PRICE_PATTERNS = (
-    (re.compile(r"€\s*([0-9][0-9.,\s]{2,})"), 1.0),
-    (re.compile(r"([0-9][0-9.,\s]{2,})\s*(?:€|EUR)\b", re.IGNORECASE), 1.0),
-    (re.compile(r"£\s*([0-9][0-9.,\s]{2,})"), 1.17),
-    (re.compile(r"([0-9][0-9.,\s]{2,})\s*GBP\b", re.IGNORECASE), 1.17),
-    (re.compile(r"US\$\s*([0-9][0-9.,\s]{2,})", re.IGNORECASE), 0.86),
-    (re.compile(r"([0-9][0-9.,\s]{2,})\s*USD\b", re.IGNORECASE), 0.86),
-    (re.compile(r"(?:CA\$|C\$)\s*([0-9][0-9.,\s]{2,})"), 0.63),
-    (re.compile(r"([0-9][0-9.,\s]{2,})\s*CAD\b", re.IGNORECASE), 0.63),
-    (re.compile(r"(?:AU\$|A\$)\s*([0-9][0-9.,\s]{2,})", re.IGNORECASE), 0.56),
-    (re.compile(r"([0-9][0-9.,\s]{2,})\s*AUD\b", re.IGNORECASE), 0.56),
-)
-GENERIC_DOLLAR_RE = re.compile(r"(?<![A-Za-z])\$\s*([0-9][0-9.,\s]{2,})")
-ANCHOR_RE = re.compile(
-    r'<a\b[^>]*href=["\'](?P<href>[^"\']+)["\'][^>]*>(?P<body>.*?)</a>',
-    re.IGNORECASE | re.DOTALL,
-)
-PROBLEM_TERMS = (
-    "defect",
-    "defekt",
-    "broken",
-    "averiad",
-    "sin devolucion",
-    "sin devolución",
-    "for parts",
-)
-UNAVAILABLE_TERMS = (
-    "out of stock", "sold out", "agotado", "no disponible", "sin stock",
-    "nicht verfügbar", "ausverkauft", "rupture de stock", "épuisé",
-    "non disponibile", "esaurito", "niet op voorraad",
-)
-CURRENCY_TO_EUR = {"EUR": 1.0, "GBP": 1.17, "USD": 0.86, "CAD": 0.63, "AUD": 0.56}
-DISCOUNT_TERMS = (
-    "save", "saving", "discount", "cashback", "coupon", "rebate",
-    "ahorra", "ahorro", "descuento", "risparmia", "économisez", "sparen",
-)
-FINANCING_TERMS = ("per month", "/month", "monthly", "al mes", "pro monat", "financing")
-EXPIRED_TERMS = ("expired:true", "expired%3atrue", "deal expired", "oferta caducada", "angebot abgelaufen")
-MIN_PLAUSIBLE_NEW_CARD_EUR = 1500.0
-ACCESSORY_TERMS = (
-    "compatible with rtx 5090", "supports rtx 5090", "rtx 5090 water block",
-    "rtx 5090 backplate", "rtx 5090 cable", "rtx 5090 connector",
-    "rtx 5090 support bracket", "rtx 5090 power supply", "rtx 5090 psu",
-)
-JSONLD_RE = re.compile(
-    r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def classify_offer(text: str) -> tuple[str, str, int]:
-    folded = re.sub(r"[-_/]+", " ", text.casefold())
-    if any(term in folded for term in PROBLEM_TERMS):
-        return "Tarjeta gráfica", "Averiada o para piezas", 2
-    if any(term in folded for term in (
-        "portatil", "portátil", "laptop", "notebook", "stealth 18", "vector 18",
-        "titan 18", "scar 18", "blade 18", "omen max", "aorus 16",
-    )):
-        return "Portátil", "Sin confirmar", 0
-    if any(term in folded for term in ("pc completo", "gaming pc", "ordenador", "desktop pc")):
-        return "PC completo", "Sin confirmar", 0
-    if any(term in folded for term in ("refurb", "reacondicion", "renewed")):
-        return "Tarjeta gráfica", "Reacondicionada", 1
-    if any(term in folded for term in ("used", "usada", "gebraucht", "segunda mano")):
-        return "Tarjeta gráfica", "Usada", 1
-    return "Tarjeta gráfica", "Nueva o sin confirmar", 0
-
-
-def value_rating(price: float, penalty: int = 0) -> int:
-    if price <= 2400:
-        rating = 5
-    elif price <= 3200:
-        rating = 4
-    elif price <= 4500:
-        rating = 3
-    elif price <= 6500:
-        rating = 2
-    else:
-        rating = 1
-    return max(1, rating - penalty)
-
-
-def load_json(path: Path, default):
-    if not path.exists():
+def load(path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
         return default
-    return json.loads(path.read_text(encoding="utf-8"))
 
+def clean(markup):
+    markup = re.sub(r"<(script|style|noscript)[^>]*>.*?</\1>", " ", markup, flags=re.I | re.S)
+    return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", markup))).casefold()
 
-def fetch(url: str, timeout: int) -> str:
-    request = Request(
-        url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 Chrome/127 Safari/537.36"
-            )
-        },
-    )
-    with urlopen(request, timeout=timeout) as response:
-        return response.read().decode("utf-8", errors="replace")
-
-
-def clean_text(fragment: str) -> str:
-    fragment = re.sub(r"<br\s*/?>", "\n", fragment, flags=re.IGNORECASE)
-    fragment = TAG_RE.sub(" ", fragment)
-    return " ".join(html.unescape(fragment).split())
-
-
-def normalize_price(raw: str) -> float | None:
-    value = raw.replace(" ", "").strip(".,")
-    if not value:
-        return None
-    if "," in value and "." in value:
-        if value.rfind(",") > value.rfind("."):
-            value = value.replace(".", "").replace(",", ".")
-        else:
-            value = value.replace(",", "")
-    elif "," in value:
-        tail = value.rsplit(",", 1)[1]
-        value = value.replace(",", ".") if len(tail) == 2 else value.replace(",", "")
-    elif value.count(".") == 1 and len(value.rsplit(".", 1)[1]) == 3:
-        value = value.replace(".", "")
+def check(source, timeout):
+    row = {"id": source["id"], "name": source["name"], "url": source["url"], "verified": False, "available": False}
     try:
-        price = float(value)
-    except ValueError:
-        return None
-    return price if 500 <= price <= 20000 else None
-
-
-def extract_prices(text: str, currency_hint: str | None = None) -> list[float]:
-    prices: list[float] = []
-    for pattern, eur_rate in PRICE_PATTERNS:
-        for match in pattern.finditer(text):
-            price = normalize_price(match.group(1))
-            if price is not None:
-                prices.append(price * eur_rate)
-    dollar_rate = CURRENCY_TO_EUR.get(str(currency_hint or "USD").upper(), 0.86)
-    for match in GENERIC_DOLLAR_RE.finditer(text):
-        price = normalize_price(match.group(1))
-        if price is not None:
-            prices.append(price * dollar_rate)
-    return prices
-
-
-def extract_price_candidates(text: str, currency_hint: str | None = None) -> list[tuple[float, int]]:
-    candidates: list[tuple[float, int]] = []
-    for pattern, eur_rate in PRICE_PATTERNS:
-        for match in pattern.finditer(text):
-            price = normalize_price(match.group(1))
-            if price is not None:
-                candidates.append((price * eur_rate, match.start()))
-    dollar_rate = CURRENCY_TO_EUR.get(str(currency_hint or "USD").upper(), 0.86)
-    for match in GENERIC_DOLLAR_RE.finditer(text):
-        price = normalize_price(match.group(1))
-        if price is not None:
-            candidates.append((price * dollar_rate, match.start()))
-    return candidates
-
-
-def purchase_price_candidates(text: str, currency_hint: str | None = None) -> list[tuple[float, int]]:
-    candidates: list[tuple[float, int]] = []
-    folded = text.casefold()
-    for price, position in extract_price_candidates(text, currency_hint):
-        before = folded[max(0, position - 45):position]
-        nearby = folded[max(0, position - 45): position + 80]
-        if any(term in before for term in DISCOUNT_TERMS):
-            continue
-        if any(term in nearby for term in FINANCING_TERMS):
-            continue
-        candidates.append((price, position))
-    return candidates
-
-
-def safe_url(base: str, href: str) -> str:
-    absolute = urljoin(base, html.unescape(href))
-    return quote(absolute, safe=":/?&=%#@+;,~")
-
-
-def canonical_id(url: str) -> str:
-    parts = urlsplit(url)
-    return urlunsplit((parts.scheme.casefold(), parts.netloc.casefold(), parts.path.rstrip("/"), "", ""))
-
-
-def iter_json_objects(value):
-    if isinstance(value, dict):
-        yield value
-        for nested in value.values():
-            yield from iter_json_objects(nested)
-    elif isinstance(value, list):
-        for nested in value:
-            yield from iter_json_objects(nested)
-
-
-def scan_jsonld(source: dict, page: str, max_price: float) -> list[dict]:
-    findings: list[dict] = []
-    seen_urls: set[str] = set()
-    for script in JSONLD_RE.findall(page):
-        try:
-            payload = json.loads(html.unescape(script).strip())
-        except (json.JSONDecodeError, TypeError):
-            continue
-        for product in iter_json_objects(payload):
-            product_type = product.get("@type", "")
-            if isinstance(product_type, list):
-                is_product = any(str(item).casefold() == "product" for item in product_type)
-            else:
-                is_product = str(product_type).casefold() == "product"
-            name = clean_text(str(product.get("name", "")))
-            folded = name.casefold()
-            if not is_product or ("rtx 5090" not in folded and "rtx5090" not in folded):
-                continue
-            if any(term in folded for term in ACCESSORY_TERMS):
-                continue
-            offers = product.get("offers", [])
-            if isinstance(offers, dict):
-                offers = [offers]
-            for offer in (offers if isinstance(offers, list) else []):
-                if not isinstance(offer, dict):
-                    continue
-                availability = str(offer.get("availability", "")).casefold()
-                if any(term in availability for term in ("outofstock", "soldout", "discontinued")):
-                    continue
-                raw_price = offer.get("price", offer.get("lowPrice"))
-                try:
-                    numeric = float(str(raw_price).replace(" ", "").replace(",", "."))
-                except (TypeError, ValueError):
-                    continue
-                currency = str(offer.get("priceCurrency", "EUR")).upper()
-                price = numeric * CURRENCY_TO_EUR.get(currency, 1.0)
-                if not 500 <= price <= max_price:
-                    continue
-                href = str(offer.get("url") or product.get("url") or source["url"])
-                url = safe_url(source["url"], href)
-                if url in seen_urls:
-                    continue
-                seen_urls.add(url)
-                category, condition, penalty = classify_offer(name + " " + url)
-                if (
-                    category == "Tarjeta gráfica"
-                    and condition == "Nueva o sin confirmar"
-                    and price < MIN_PLAUSIBLE_NEW_CARD_EUR
-                ):
-                    continue
-                findings.append({
-                    "id": canonical_id(url), "source": source["name"], "price_eur": price,
-                    "category": category, "condition": condition,
-                    "rating": value_rating(price, penalty), "url": url,
-                    "date": datetime.now(timezone.utc).isoformat(), "summary": name[:240],
-                    "verification": "Datos estructurados del producto", "kind": "listing",
-                    "currency_hint": currency,
-                })
-    return findings
-
-
-def scan_telegram(
-    source: dict, page: str, max_price: float, max_post_age_hours: int
-) -> list[dict]:
-    findings: list[dict] = []
-    for match in MESSAGE_RE.finditer(page):
-        fragment = match.group(0)
-        text = clean_text(fragment)
-        folded = text.casefold()
-        if "rtx 5090" not in folded and "rtx5090" not in folded:
-            continue
-        if re.search(r'to\s+["“]?out of stock', folded):
-            continue
-        prices = extract_prices(text)
-        qualifying = [price for price in prices if price <= max_price]
-        if not qualifying:
-            continue
-        date_match = DATETIME_RE.search(fragment)
-        if not date_match:
-            continue
-        try:
-            posted = datetime.fromisoformat(date_match.group(1).replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_post_age_hours)
-        if posted.astimezone(timezone.utc) < cutoff:
-            continue
-        post = match.group("post")
-        category, condition, penalty = classify_offer(text)
-        price = min(qualifying)
-        findings.append(
-            {
-                "id": post,
-                "source": source["name"],
-                "price_eur": price,
-                "category": category,
-                "condition": condition,
-                "rating": value_rating(price, penalty),
-                "url": f"https://t.me/{post}",
-                "date": date_match.group(1),
-                "summary": text[:240],
-                "verification": "Precio publicado en Telegram",
-                "kind": "telegram",
-            }
-        )
-    return findings
-
-
-def scan_web(source: dict, page: str, max_price: float) -> list[dict]:
-    text = clean_text(page)
-    folded = text.casefold()
-    if "rtx 5090" not in folded and "rtx5090" not in folded:
-        return []
-    unavailable = [term.casefold() for term in source.get("unavailable_terms", [])]
-    if any(term in folded for term in unavailable):
-        return []
-    price = float(source.get("price_eur", 0))
-    if not 500 <= price <= max_price:
-        return []
-    category, condition, penalty = classify_offer(text)
-    return [
-        {
-            "id": source["url"],
-            "source": source["name"],
-            "price_eur": price,
-            "category": source.get("category", category),
-            "condition": source.get("condition", condition),
-            "rating": value_rating(price, penalty),
-            "url": source["url"],
-            "date": datetime.now(timezone.utc).isoformat(),
-            "summary": text[:240],
-            "verification": "Página oficial directa",
-            "kind": "web",
-        }
-    ]
-
-
-def scan_listing(source: dict, page: str, max_price: float) -> list[dict]:
-    structured = scan_jsonld(source, page, max_price)
-    if structured:
-        return structured[: int(source.get("max_results", 16))]
-    findings: list[dict] = []
-    for match in ANCHOR_RE.finditer(page):
-        title = clean_text(match.group("body"))
-        folded_title = title.casefold()
-        if "rtx 5090" not in folded_title and "rtx5090" not in folded_title:
-            continue
-        if any(term in folded_title for term in ACCESSORY_TERMS):
-            continue
-        start = max(0, match.start() - 500)
-        end = min(len(page), match.end() + 850)
-        context = clean_text(page[start:end])
-        if any(term in context.casefold() for term in UNAVAILABLE_TERMS):
-            continue
-        candidates = [(price, pos) for price, pos in purchase_price_candidates(context, source.get("currency")) if price <= max_price]
-        if not candidates:
-            continue
-        href = html.unescape(match.group("href"))
-        if href.startswith(("javascript:", "#")):
-            continue
-        expiry_text = (href + " " + context).casefold()
-        if any(term in expiry_text for term in EXPIRED_TERMS):
-            continue
-        anchor_position = match.start() - start
-        price, _ = min(candidates, key=lambda candidate: abs(candidate[1] - anchor_position))
-        category, condition, penalty = classify_offer(context + " " + href)
-        if (
-            category == "Tarjeta gráfica"
-            and condition == "Nueva o sin confirmar"
-            and price < MIN_PLAUSIBLE_NEW_CARD_EUR
-        ):
-            continue
-        url = safe_url(source["url"], href)
-        findings.append(
-            {
-                "id": canonical_id(url),
-                "source": source["name"],
-                "price_eur": price,
-                "category": category,
-                "condition": condition,
-                "rating": value_rating(price, penalty),
-                "url": url,
-                "date": datetime.now(timezone.utc).isoformat(),
-                "summary": context[:240],
-                "verification": "Pendiente de comprobar", "kind": "listing",
-                "currency_hint": source.get("currency", ""),
-            }
-        )
-        if len(findings) >= int(source.get("max_results", 16)):
-            break
-    return findings
-
-
-def verify_listing(item: dict, timeout: int) -> tuple[dict | None, str | None]:
-    if item.get("verification") == "Datos estructurados del producto":
-        item["verification"] = "Verificado en datos del producto"
-        return item, None
-    try:
-        page = fetch(item["url"], timeout)
-    except Exception as exc:
-        item["verification"] = "No verificable; confirma al abrir"
-        return item, f"{item['source']} (verificación): {type(exc).__name__}"
-    text = clean_text(page)
-    folded = text.casefold()
-    if "rtx 5090" not in folded and "rtx5090" not in folded:
-        return None, f"{item['source']}: producto descartado por no ser RTX 5090"
-    prices = [price for price, _ in purchase_price_candidates(text, item.get("currency_hint"))]
-    expected = float(item["price_eur"])
-    tolerance = max(20.0, expected * 0.04)
-    if not any(abs(price - expected) <= tolerance for price in prices):
-        return None, f"{item['source']}: precio descartado por no coincidir con el producto"
-    item["verification"] = "Precio verificado en la oferta"
-    return item, None
-
-
-def balance_sources(findings: list[dict], per_source: int) -> list[dict]:
-    counts: dict[str, int] = {}
-    balanced: list[dict] = []
-    for item in sorted(findings, key=lambda row: (-row["rating"], row["price_eur"])):
-        source = item["source"]
-        if counts.get(source, 0) >= per_source:
-            continue
-        counts[source] = counts.get(source, 0) + 1
-        balanced.append(item)
-    return balanced
-
-
-def fetch_and_scan(kind: str, source: dict, timeout: int, max_price: float, max_age: int):
-    page = fetch(source["url"], timeout)
-    if kind == "telegram":
-        return scan_telegram(source, page, max_price, max_age)
-    if kind == "listing":
-        return scan_listing(source, page, max_price)
-    return scan_web(source, page, max_price)
-
-
-def render_report(findings: list[dict], excellent_price: float, errors: list[str]) -> str:
-    timestamp = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-    lines = [
-        "# Resultados del monitor RTX 5090",
-        "",
-        f"Última comprobación: {timestamp}",
-        "",
-    ]
-    if findings:
-        lines += ["| Valoración | Precio | Tipo | Estado | Comprobación | Fuente | Fecha | Enlace |", "|---|---:|---|---|---|---|---|---|"]
-        for item in sorted(findings, key=lambda row: (-row["rating"], row["price_eur"])):
-            level = "★" * item["rating"] + "☆" * (5 - item["rating"])
-            date = item["date"][:10] or "Sin fecha"
-            lines.append(
-                f"| {level} | {item['price_eur']:.2f} € | {item['category']} | {item['condition']} | {item.get('verification', 'Sin comprobar')} | {item['source']} | "
-                f"{date} | [Abrir oferta]({item['url']}) |"
-            )
+        request = Request(source["url"], headers={"User-Agent": "Mozilla/5.0 (ZeldaStockMonitor/1.0)", "Accept-Language": "es-ES,es;q=0.9"})
+        with urlopen(request, timeout=timeout) as response:
+            text = clean(response.read().decode("utf-8", errors="replace"))
+    except (OSError, URLError, TimeoutError) as error:
+        row["detail"] = f"No verificable: {error}"
+        return row
+    if not all(x.casefold() in text for x in source["required_terms"]):
+        row["detail"] = "La página no confirmó el producto exacto"
+    elif any(x.casefold() in text for x in source["unavailable_terms"]):
+        row.update(verified=True, detail="Aún no disponible")
+    elif any(x.casefold() in text for x in source["available_terms"]):
+        row.update(verified=True, available=True, detail="Reserva o compra detectada")
     else:
-        lines.append("No se encontraron publicaciones dentro del límite configurado.")
-    if errors:
-        lines += ["", "## Fuentes que no respondieron", ""]
-        lines.extend(f"- {error}" for error in errors)
-    lines.append("")
-    return "\n".join(lines)
+        row.update(verified=True, detail="Estado no concluyente; no se avisará")
+    return row
 
-
-def render_html(findings: list[dict], excellent_price: float, errors: list[str]) -> str:
-    timestamp = datetime.now(timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M %Z")
-    cards = []
-    for item in sorted(findings, key=lambda row: (-row["rating"], row["price_eur"])):
-        level = "★" * item["rating"] + "☆" * (5 - item["rating"])
-        cards.append(
-            '<article class="offer">'
-            f'<span class="badge">{html.escape(level)}</span>'
-            f'<h2>{item["price_eur"]:.2f} €</h2>'
-            f'<p><strong>{html.escape(item["category"])}</strong> · {html.escape(item["condition"])}</p>'
-            f'<p class="check">{html.escape(item.get("verification", "Sin comprobar"))}</p>'
-            f'<p>{html.escape(item["source"])}</p>'
-            f'<p class="date">Detectada: {html.escape(item["date"][:10] or "Sin fecha")}</p>'
-            f'<a href="{html.escape(item["url"], quote=True)}" target="_blank" rel="noopener">Abrir oferta</a>'
-            '</article>'
-        )
-    content = "".join(cards) or (
-        '<section class="empty"><h2>No hay ofertas que cumplan el límite</h2>'
-        '<p>Volveremos a comprobar las fuentes automáticamente.</p></section>'
-    )
-    warning = ""
-    if errors:
-        warning = f'<p class="warning">Fuentes temporalmente inaccesibles: {len(errors)}</p>'
-    return f'''<!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ofertas internacionales RTX 5090</title><style>
-:root{{--bg:#080b12;--panel:#121826;--text:#f5f7fb;--muted:#aab4c5;--accent:#76b900}}
-*{{box-sizing:border-box}}body{{margin:0;background:linear-gradient(145deg,#080b12,#111827);color:var(--text);font:16px system-ui,sans-serif;min-height:100vh}}
-main{{max-width:900px;margin:auto;padding:48px 20px}}h1{{font-size:clamp(2rem,6vw,4rem);margin:.2em 0}}header p,.empty p{{color:var(--muted)}}
-.status{{display:inline-block;color:#b9f36a;border:1px solid #4b6f24;border-radius:999px;padding:7px 12px}}.grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:28px}}
-.offer,.empty{{background:rgba(18,24,38,.9);border:1px solid #263044;border-radius:18px;padding:24px;box-shadow:0 14px 40px #0005}}.offer h2{{font-size:2rem;margin:14px 0 6px}}
-.badge{{font-size:.8rem;background:#27430b;color:#caff8e;border-radius:999px;padding:6px 9px}}a{{display:inline-block;margin-top:12px;color:#111;background:var(--accent);padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}}
-.warning{{color:#ffd479}}.updated{{display:inline-block;margin-top:10px;color:#fff;background:#1d293d;border-radius:10px;padding:9px 12px}}.check{{color:#b9f36a;font-size:.88rem}}.date{{color:var(--muted);font-size:.88rem}}footer{{margin-top:36px;color:var(--muted);font-size:.9rem}}
-</style></head><body><main><header><span class="status">● Monitor activo 24/7</span><h1>RTX 5090: ofertas internacionales</h1><p>Valoradas de mejor a peor · Precio máximo 10.000 € · Tarjetas, equipos y portátiles</p></header>
-<p class="updated">Actualizado: {html.escape(timestamp)}</p>{warning}<section class="grid">{content}</section><footer>Última comprobación: {html.escape(timestamp)} · Mercados internacionales · Cuatro revisiones diarias, una cada seis horas.</footer></main></body></html>'''
-
-
-def main() -> int:
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    parser = argparse.ArgumentParser(description="Busca ofertas RTX 5090 en Telegram público")
-    parser.add_argument("--all", action="store_true", help="muestra también publicaciones ya vistas")
-    args = parser.parse_args()
-
-    config = load_json(CONFIG_PATH, {})
-    state = load_json(STATE_PATH, {"seen": []})
-    seen = set(state.get("seen", []))
-    timeout = int(config.get("request_timeout_seconds", 20))
-    max_price = float(config.get("max_price_eur", 2800))
-    max_post_age_hours = int(config.get("max_post_age_hours", 72))
-    excellent_price = float(config.get("excellent_price_eur", 2400))
-    per_source = int(config.get("display_results_per_source", 4))
-    findings: list[dict] = []
-    errors: list[str] = []
-
-    source_jobs = []
-    source_jobs.extend(("telegram", source) for source in config.get("telegram_sources", []))
-    source_jobs.extend(("web", source) for source in config.get("web_sources", []))
-    source_jobs.extend(("listing", source) for source in config.get("listing_sources", []))
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {
-            executor.submit(
-                fetch_and_scan, kind, source, timeout, max_price, max_post_age_hours
-            ): source
-            for kind, source in source_jobs
-        }
-        for future in as_completed(futures):
-            source = futures[future]
-            try:
-                findings.extend(future.result())
-            except Exception as exc:
-                errors.append(f"{source['name']}: {type(exc).__name__}")
-
-    unique = {item["id"]: item for item in findings}
-    candidates = balance_sources(list(unique.values()), per_source)
-    listing_candidates = [item for item in candidates if item.get("kind") == "listing"]
-    other_candidates = [item for item in candidates if item.get("kind") != "listing"]
-    checked: list[dict] = list(other_candidates)
-    with ThreadPoolExecutor(max_workers=16) as executor:
-        futures = {executor.submit(verify_listing, item, timeout): item for item in listing_candidates}
-        for future in as_completed(futures):
-            item, warning = future.result()
-            if item is not None:
-                checked.append(item)
-            if warning:
-                errors.append(warning)
-    all_findings = sorted(checked, key=lambda row: (-row["rating"], row["price_eur"]))
-    visible = all_findings if args.all else [item for item in all_findings if item["id"] not in seen]
-    REPORT_PATH.write_text(render_report(visible, excellent_price, errors), encoding="utf-8")
-    NEW_PATH.write_text(json.dumps(visible, indent=2, ensure_ascii=False), encoding="utf-8")
-    DOCS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    DOCS_PATH.write_text(render_html(all_findings, excellent_price, errors), encoding="utf-8")
-
-    state["seen"] = sorted(seen | {item["id"] for item in all_findings})
-    state["last_run"] = datetime.now(timezone.utc).isoformat()
-    STATE_PATH.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
-
-    print(REPORT_PATH.read_text(encoding="utf-8"))
-    # Una tienda puede bloquear temporalmente el rastreo; el informe sigue siendo válido
-    # si el resto de fuentes se procesó. Las fuentes fallidas aparecen en el informe.
-    return 0
-
+def main():
+    config = load(CONFIG, {})
+    old = load(STATE, {"sources": {}}).get("sources", {})
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    rows = [check(s, config.get("timeout_seconds", 25)) for s in config.get("sources", [])]
+    alerts, sources = [], dict(old)
+    for row in rows:
+        previous = old.get(row["id"], {})
+        if row["verified"]:
+            if row["available"] and not previous.get("available", False):
+                alerts.append(row)
+            sources[row["id"]] = {"available": row["available"], "checked_at": now}
+    STATE.write_text(json.dumps({"sources": sources, "last_run": now}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    ALERTS.write_text(json.dumps(alerts, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    report = ["# Seguimiento: Nintendo Switch 2 Zelda 40.º aniversario", "", f"Última comprobación: **{now}**.", "", "| Tienda | Estado | Enlace |", "|---|---|---|"]
+    for row in rows:
+        status = "✅ Disponible" if row["available"] else ("⚪ No verificado" if not row["verified"] else "⏳ No disponible")
+        report.append(f"| {row['name']} | {status}: {row['detail']} | [Abrir]({row['url']}) |")
+    LATEST.write_text("\n".join(report) + "\n", encoding="utf-8")
+    DOCS.parent.mkdir(exist_ok=True)
+    DOCS.write_text("<!doctype html><meta charset=utf-8><title>Reservas Zelda Switch 2</title><h1>Switch 2 Zelda 40.º aniversario</h1><p>El último estado se publica en latest.md.</p>", encoding="utf-8")
+    print(f"Comprobadas {len(rows)} tiendas; alertas nuevas: {len(alerts)}")
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
