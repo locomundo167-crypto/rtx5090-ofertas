@@ -1,6 +1,6 @@
 # Seguimiento: Nintendo Switch 2 Zelda 40.º aniversario
 
-Última comprobación: **2026-09-10 18:44 UTC**.
+Última comprobación: **2026-09-10 18:58 UTC**.
 
 | Tienda | Estado | Enlace |
 |---|---|---|
@@ -10,4 +10,4 @@
 | MediaMarkt España | ⚪ No verificado: No verificable: HTTP Error 403: Forbidden | [Abrir](https://www.mediamarkt.es/es/product/_consola-nintendo-switch-2-edicion-zelda-40-aniversario-79-full-hd-hdr-120-hz-256-gb-magnetic-joy-con-2-con-modo-raton-bateria-extraible-1674231.html) |
 | Fnac España | ⚪ No verificado: No verificable: HTTP Error 403: Forbidden | [Abrir](https://www.fnac.es/Consola-Nintendo-Switch-2-The-Legend-of-Zelda-40-Aniversario-Videoconsola-Consola-Nintendo-Switch-2/a13481099) |
 | El Corte Inglés (búsqueda de ficha) | ⚪ No verificado: No verificable: HTTP Error 403: Forbidden | [Abrir](https://www.elcorteingles.es/search-nwx/?s=Nintendo+Switch+2+Zelda+40+aniversario&stype=text_box) |
-| Impact Game | ⏳ No disponible: Aún no disponible | [Abrir](https://impactgame.es/producto/reserva-consola-nintendo-switch-2-zelda-40-aniversario/) |
+| Impact Game | ⚪ No verificado: No verificable: The read operation timed out | [Abrir](https://impactgame.es/producto/reserva-consola-nintendo-switch-2-zelda-40-aniversario/) |
