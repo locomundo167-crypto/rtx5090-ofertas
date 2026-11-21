@@ -1,6 +1,6 @@
 # Seguimiento: Nintendo Switch 2 Zelda 40.º aniversario
 
-Última comprobación: **2026-11-21 15:37 UTC**.
+Última comprobación: **2026-11-21 21:09 UTC**.
 
 | Tienda | Estado | Enlace |
 |---|---|---|
